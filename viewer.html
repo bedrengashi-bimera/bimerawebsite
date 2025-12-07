@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Engineering 3D Model Viewer</title>
+<style>
+    body {
+        margin: 0;
+        overflow: hidden;
+        background: #f2f2f2;
+        font-family: Arial, sans-serif;
+    }
+
+    #container {
+        width: 100vw;
+        height: 100vh;
+    }
+
+    /* Simple UI panel */
+    #ui {
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        background: rgba(255,255,255,0.9);
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0px 4px 12px rgba(0,0,0,0.15);
+        z-index: 10;
+    }
+
+    #ui label { font-weight: bold; }
+</style>
+</head>
+
+<body>
+<div id="container"></div>
+
+<!-- UI Panel -->
+<div id="ui">
+    <div>
+        <label>Transparency:</label><br>
+        <input id="opacitySlider" type="range" min="0" max="100" value="100">
+    </div>
+    <br>
+    <button id="toggleGrid">Toggle Grid</button>
+</div>
+
+<script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.164/build/three.module.js';
+    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.164/examples/jsm/controls/OrbitControls.js';
+    import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.164/examples/jsm/loaders/GLTFLoader.js';
+
+    const container = document.getElementById('container');
+    const scene = new THREE.Scene();
+
+    // Neutral engineering lighting
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x999999, 1.1);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    dirLight.position.set(5, 10, 7);
+    scene.add(dirLight);
+
+    // Camera
+    const camera = new THREE.PerspectiveCamera(
+        45,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        2000
+    );
+    camera.position.set(6, 6, 6);
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    container.appendChild(renderer.domElement);
+
+    // Controls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    // Grid
+    const grid = new THREE.GridHelper(10, 20, 0x444444, 0x888888);
+    scene.add(grid);
+
+    // Load GLB model
+    let model = null;
+
+    const loader = new GLTFLoader();
+    loader.load(
+        "https://github.com/bedrengashi-bimera/bimerawebsite/raw/refs/heads/main/kinglymodel.glb",
+        function (gltf) {
+            model = gltf.scene;
+            scene.add(model);
+
+            // Center the model
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            model.position.sub(center);
+
+            // Auto-scale to fit view
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            model.scale.setScalar(2 / maxDim);
+        },
+        undefined,
+        (err) => console.error(err)
+    );
+
+    // UI: Transparency slider
+    document.getElementById("opacitySlider").addEventListener("input", function () {
+        const value = this.value / 100;  // convert 0–100 → 0–1
+
+        if (model) {
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    child.material.transparent = true;
+                    child.material.opacity = value;
+                    child.material.needsUpdate = true;
+                }
+            });
+        }
+    });
+
+    // UI: Toggle grid
+    document.getElementById("toggleGrid").onclick = () => {
+        grid.visible = !grid.visible;
+    };
+
+    // Resize
+    window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Animation loop
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    }
+    animate();
+
+</script>
+</body>
+</html>
